@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, TextInput, Alert, Linking } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, TextInput, Alert, Linking, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -17,17 +17,144 @@ interface SupportTicket {
   subject: string;
 }
 
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  data?: any;
+}
+
+interface HelpItem {
+  title: string;
+  description: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+}
+
 const ROLES = ['Водитель', 'Пассажир'];
+
+const HelpSection = () => {
+  const handleEmailPress = (subject: string) => {
+    const mailtoUrl = `mailto:gorislavecz86@mail.ru?subject=${encodeURIComponent(subject)}`;
+    Linking.canOpenURL(mailtoUrl).then(supported => {
+      if (supported) {
+        Linking.openURL(mailtoUrl);
+      } else {
+        Alert.alert(
+          'Ошибка',
+          'Не удалось открыть почтовый клиент. Пожалуйста, проверьте настройки вашего устройства.'
+        );
+      }
+    });
+  };
+
+  const helpItems: HelpItem[] = [
+    {
+      title: 'Как использовать приложение',
+      description: 'Пошаговая инструкция по использованию основных функций приложения',
+      icon: 'help-circle-outline',
+      onPress: () => {
+        Alert.alert(
+          'Как использовать приложение',
+          '1. Введите адрес назначения\n2. Нажмите "Построить маршрут"\n3. Следуйте инструкциям на карте\n4. При необходимости свяжитесь с водителем',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+    },
+    {
+      title: 'Часто задаваемые вопросы',
+      description: 'Ответы на популярные вопросы пользователей',
+      icon: 'chatbubble-ellipses-outline',
+      onPress: () => {
+        Alert.alert(
+          'Часто задаваемые вопросы',
+          '1. Как заказать такси?\n2. Как оплатить поездку?\n3. Как отменить заказ?\n4. Как связаться с водителем?',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+    },
+    {
+      title: 'Связаться с поддержкой',
+      description: 'Получить помощь от службы поддержки',
+      icon: 'headset-outline',
+      onPress: () => {
+        Alert.alert(
+          'Связаться с поддержкой',
+          'Выберите способ связи:',
+          [
+            {
+              text: 'Написать на email',
+              onPress: () => handleEmailPress('Обращение в службу поддержки')
+            },
+            {
+              text: 'Отмена',
+              style: 'cancel'
+            }
+          ]
+        );
+      }
+    },
+    {
+      title: 'Политика конфиденциальности',
+      description: 'Информация о защите ваших данных',
+      icon: 'shield-checkmark-outline',
+      onPress: () => {
+        Alert.alert(
+          'Политика конфиденциальности',
+          'Мы заботимся о защите ваших персональных данных. Все данные шифруются и хранятся в соответствии с законодательством.',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+    },
+    {
+      title: 'Условия использования',
+      description: 'Правила использования приложения',
+      icon: 'document-text-outline',
+      onPress: () => {
+        Alert.alert(
+          'Условия использования',
+          '1. Приложение предназначено для заказа такси\n2. Минимальная стоимость поездки: 300₽\n3. Оплата производится после завершения поездки\n4. В случае отмены заказа менее чем за 5 минут до подачи автомобиля, взимается штраф',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+    }
+  ];
+
+  return (
+    <View style={styles.helpSection}>
+      <Text style={styles.sectionTitle}>Помощь и поддержка</Text>
+      {helpItems.map((item, index) => (
+        <TouchableOpacity
+          key={index}
+          style={styles.helpItem}
+          onPress={item.onPress}
+        >
+          <View style={styles.helpItemContent}>
+            <Ionicons name={item.icon} size={24} color="#007AFF" />
+            <View style={styles.helpItemText}>
+              <Text style={styles.helpItemTitle}>{item.title}</Text>
+              <Text style={styles.helpItemDescription}>{item.description}</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+};
 
 const ProfileScreen = () => {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isRolePickerVisible, setIsRolePickerVisible] = useState(false);
   const [isSecurityModalVisible, setIsSecurityModalVisible] = useState(false);
   const [profile, setProfile] = useState<UserProfile>({
-    name: 'Иван',
-    surname: 'Иванов',
+    name: 'Хасан',
+    surname: 'Рахимбаев',
     role: 'Водитель',
-    avatar: 'https://via.placeholder.com/150',
+    avatar: '/assets/images/hasan.png',
   });
   const [editedProfile, setEditedProfile] = useState<UserProfile>(profile);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([
@@ -44,6 +171,96 @@ const ProfileScreen = () => {
       subject: 'Вопрос о тарифах'
     }
   ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const fetchNotifications = async () => {
+    try {
+      console.log('Получение уведомлений...');
+      
+      const response = await fetch('http://192.168.217.205:5000/notifications', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Получены уведомления:', data);
+      
+      // Проверяем, что data является массивом
+      if (Array.isArray(data)) {
+        setNotifications(data);
+      } else {
+        console.error('Получены некорректные данные:', data);
+        setNotifications([]);
+      }
+      
+    } catch (error: any) {
+      console.error('Ошибка получения уведомлений:', error);
+      setNotifications([]);
+    }
+  };
+
+  const markAsRead = async (id: string) => {
+    try {
+      console.log('Отметка уведомления как прочитанного:', id);
+      
+      const response = await fetch(`http://192.168.217.205:5000/notifications/${id}/read`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      // Обновляем состояние уведомлений
+      setNotifications(prevNotifications =>
+        prevNotifications.map(notification =>
+          notification.id === id
+            ? { ...notification, read: true }
+            : notification
+        )
+      );
+      
+    } catch (error: any) {
+      console.error('Ошибка при отметке уведомления как прочитанного:', error);
+    }
+  };
+
+  // Обновляем уведомления каждые 30 секунд
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const renderNotification = ({ item }: { item: Notification }) => (
+    <TouchableOpacity 
+      style={[
+        styles.notificationItem,
+        !item.read && styles.unreadNotification
+      ]}
+      onPress={() => markAsRead(item.id)}
+    >
+      <View style={styles.notificationContent}>
+        <Text style={styles.notificationTitle}>{item.title}</Text>
+        <Text style={styles.notificationMessage}>{item.message}</Text>
+        <Text style={styles.notificationTime}>
+          {new Date(item.timestamp).toLocaleString()}
+        </Text>
+      </View>
+      {!item.read && <View style={styles.unreadDot} />}
+    </TouchableOpacity>
+  );
 
   const handleEditPress = () => {
     setEditedProfile(profile);
@@ -137,62 +354,72 @@ const ProfileScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Image
-          source={{ uri: profile.avatar }}
-          style={styles.avatar}
-        />
-        <Text style={styles.name}>{profile.name} {profile.surname}</Text>
-        <Text style={styles.role}>{profile.role}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Статистика</Text>
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Ionicons name="car" size={24} color="#007AFF" />
-            <Text style={styles.statValue}>150</Text>
-            <Text style={styles.statLabel}>Поездок</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="star" size={24} color="#FFD700" />
-            <Text style={styles.statValue}>4.8</Text>
-            <Text style={styles.statLabel}>Рейтинг</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="time" size={24} color="#34C759" />
-            <Text style={styles.statValue}>98%</Text>
-            <Text style={styles.statLabel}>Время</Text>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.header}>
+          <Image 
+            source={require('../assets/images/hasan.png')} 
+            style={styles.profileImage}
+          />
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{profile.name} {profile.surname}</Text>
+            <Text style={styles.userRole}>{profile.role}</Text>
           </View>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Настройки</Text>
-        <TouchableOpacity style={styles.menuItem} onPress={handleEditPress}>
-          <Ionicons name="person-outline" size={24} color="#333" />
-          <Text style={styles.menuText}>Редактировать профиль</Text>
-          <Ionicons name="chevron-forward" size={24} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="notifications-outline" size={24} color="#333" />
-          <Text style={styles.menuText}>Уведомления</Text>
-          <Ionicons name="chevron-forward" size={24} color="#999" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={() => setIsSecurityModalVisible(true)}
-        >
-          <Ionicons name="shield-outline" size={24} color="#333" />
-          <Text style={styles.menuText}>Безопасность</Text>
-          <Ionicons name="chevron-forward" size={24} color="#999" />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Статистика</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Ionicons name="car" size={24} color="#007AFF" />
+              <Text style={styles.statValue}>150</Text>
+              <Text style={styles.statLabel}>Поездок</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="star" size={24} color="#FFD700" />
+              <Text style={styles.statValue}>4.8</Text>
+              <Text style={styles.statLabel}>Рейтинг</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="time" size={24} color="#34C759" />
+              <Text style={styles.statValue}>98%</Text>
+              <Text style={styles.statLabel}>Время</Text>
+            </View>
+          </View>
+        </View>
 
-      <TouchableOpacity style={styles.logoutButton}>
-        <Text style={styles.logoutText}>Выйти</Text>
-      </TouchableOpacity>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Настройки</Text>
+          <TouchableOpacity style={styles.menuItem} onPress={handleEditPress}>
+            <Ionicons name="person-outline" size={24} color="#333" />
+            <Text style={styles.menuText}>Редактировать профиль</Text>
+            <Ionicons name="chevron-forward" size={24} color="#999" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.menuItem} 
+            onPress={() => setIsSecurityModalVisible(true)}
+          >
+            <Ionicons name="shield-outline" size={24} color="#333" />
+            <Text style={styles.menuText}>Безопасность</Text>
+            <Ionicons name="chevron-forward" size={24} color="#999" />
+          </TouchableOpacity>
+        </View>
+
+        <HelpSection />
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Уведомления</Text>
+          <FlatList
+            data={notifications}
+            renderItem={renderNotification}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>Нет новых уведомлений</Text>
+            }
+          />
+        </View>
+      </ScrollView>
 
       <Modal
         animationType="slide"
@@ -358,7 +585,7 @@ const ProfileScreen = () => {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 };
 
@@ -367,6 +594,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
+  scrollView: {
+    flex: 1,
+  },
   header: {
     alignItems: 'center',
     padding: 20,
@@ -374,18 +604,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
   },
-  avatar: {
+  profileImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
     marginBottom: 10,
   },
-  name: {
+  userInfo: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  userName: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 5,
   },
-  role: {
+  userRole: {
     fontSize: 16,
     color: '#666',
   },
@@ -619,7 +853,88 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 24,
     fontWeight: 'bold',
-  }
+  },
+  helpSection: {
+    marginTop: 20,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+  },
+  helpItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  helpItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  helpItemText: {
+    marginLeft: 15,
+    flex: 1,
+  },
+  helpItemTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  helpItemDescription: {
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+  listContainer: {
+    padding: 10,
+  },
+  notificationItem: {
+    backgroundColor: '#FFFFFF',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  unreadNotification: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#007AFF',
+  },
+  notificationContent: {
+    flex: 1,
+  },
+  notificationTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#333',
+  },
+  notificationMessage: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  notificationTime: {
+    fontSize: 12,
+    color: '#999',
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#007AFF',
+    position: 'absolute',
+    top: 15,
+    right: 15,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 16,
+    marginTop: 20,
+    padding: 20,
+  },
 });
 
 export default ProfileScreen; 

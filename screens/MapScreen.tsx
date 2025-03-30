@@ -19,6 +19,9 @@ const MapScreen = () => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [webViewReady, setWebViewReady] = useState(false);
   const [gpsData, setGpsData] = useState<GPSPoint[]>([]);
+  const [currentSpeed, setCurrentSpeed] = useState<number | null>(null);
+  const [isNavigatorMode, setIsNavigatorMode] = useState(false);
+  const [destinationAddress, setDestinationAddress] = useState<string | null>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const webViewRef = useRef<WebView>(null);
 
@@ -100,6 +103,12 @@ const MapScreen = () => {
           if (location && location.coords) {
             const coordinates: [number, number] = [location.coords.longitude, location.coords.latitude];
             setUserLocation(coordinates);
+
+            // Обновляем текущую скорость
+            if (location.coords.speed !== null) {
+              const speedKmh = location.coords.speed * 3.6; // Конвертируем м/с в км/ч
+              setCurrentSpeed(speedKmh);
+            }
 
             const newPoint: GPSPoint = {
               lat: location.coords.latitude,
@@ -186,7 +195,8 @@ const MapScreen = () => {
           window.dispatchEvent(new MessageEvent('message', {
             data: ${JSON.stringify({
               type: 'location',
-              coordinates: userLocation
+              coordinates: userLocation,
+              updateMap: true
             })}
           }));
         `);
@@ -207,7 +217,8 @@ const MapScreen = () => {
           window.dispatchEvent(new MessageEvent('message', {
             data: ${JSON.stringify({
               type: 'location',
-              coordinates: coordinates
+              coordinates: coordinates,
+              updateMap: false
             })}
           }));
         `);
@@ -257,6 +268,45 @@ const MapScreen = () => {
       console.error('Ошибка обработки сообщения:', error);
     }
   };
+
+  const getCurrentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Ошибка', 'Необходим доступ к местоположению');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      setUserLocation([location.coords.longitude, location.coords.latitude]);
+
+      // Отправляем местоположение в WebView
+      if (webViewRef.current) {
+        const locationData = {
+          type: 'location',
+          coords: {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude
+          }
+        };
+        webViewRef.current.injectJavaScript(`
+          window.dispatchEvent(new MessageEvent('message', {
+            data: ${JSON.stringify(locationData)}
+          }));
+        `);
+      }
+    } catch (error) {
+      console.error('Ошибка получения местоположения:', error);
+      Alert.alert('Ошибка', 'Не удалось получить местоположение');
+    }
+  };
+
+  useEffect(() => {
+    getCurrentLocation();
+  }, []);
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -366,6 +416,7 @@ const MapScreen = () => {
                     key: API_KEY,
                     center: [76.894130, 43.242781],
                     zoom: 13,
+                    trafficControl: 'centerLeft',
                 });
                 console.log("Map initialized successfully");
 
@@ -374,10 +425,8 @@ const MapScreen = () => {
                 });
                 console.log("Directions initialized successfully");
 
-                // Добавляем обработчик загрузки карты
                 map.on('load', () => {
                     console.log("Map loaded successfully");
-                    // Отправляем сообщение о готовности карты
                     window.ReactNativeWebView.postMessage(JSON.stringify({
                         type: 'mapReady'
                     }));
@@ -414,9 +463,6 @@ const MapScreen = () => {
                     coordinates: userLocation,
                     icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDIwIDIwIj48Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSI4IiBmaWxsPSIjMDA3QUZGIi8+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMyIgZmlsbD0id2hpdGUiLz48L3N2Zz4='
                 });
-                
-                map.setCenter(userLocation);
-                map.setZoom(15);
                 console.log("Location marker set successfully");
             } catch (error) {
                 console.error("Error setting location marker:", error);
@@ -444,7 +490,6 @@ const MapScreen = () => {
             }
         });
 
-        // Инициализируем карту после загрузки всех скриптов
         window.addEventListener('load', initializeMap);
 
         function getSuggestions(query) {
@@ -529,8 +574,6 @@ const MapScreen = () => {
                     getTravelTime(source, destination);
                 })
                 .catch(error => console.error("Ошибка построения маршрута:", error));
-            map.setCenter(destination);
-            map.setZoom(14);
         }
 
         function buildRoute() {
@@ -594,10 +637,10 @@ const MapScreen = () => {
         </View>
       )}
 
-      {gpsData.length > 0 && (
+      {currentSpeed !== null && (
         <View style={styles.gpsInfo}>
           <Text style={styles.gpsText}>
-            Последняя скорость: {gpsData[gpsData.length - 1].speed?.toFixed(2)} км/ч
+            Текущая скорость: {currentSpeed.toFixed(2)} км/ч
           </Text>
         </View>
       )}

@@ -16,7 +16,11 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.h2taxi.app"
+      "bundleIdentifier": "com.h2taxi.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Приложению необходим доступ к геолокации для отображения вашего местоположения на карте",
+        "NSLocationAlwaysUsageDescription": "Приложению необходим доступ к геолокации для отображения вашего местоположения на карте"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +28,11 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.h2taxi.app",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -36,6 +44,12 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#ffffff",
           "sounds": ["./assets/sounds/notification.wav"]
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Приложению необходим доступ к геолокации для отображения вашего местоположения на карте"
         }
       ]
     ],
