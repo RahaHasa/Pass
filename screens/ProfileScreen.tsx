@@ -34,7 +34,33 @@ interface HelpItem {
   onPress: () => void;
 }
 
-const ROLES = ['Водитель', 'Пассажир'];
+interface RideHistory {
+  id: string;
+  date: string;
+  from: string;
+  to: string;
+  price: number;
+  paymentMethod: string;
+  status: 'completed' | 'cancelled';
+}
+
+interface PaymentMethod {
+  id: string;
+  type: 'card' | 'cash';
+  lastFourDigits?: string;
+  isDefault: boolean;
+  cardHolder?: string;
+  expiryDate?: string;
+}
+
+interface PromoCode {
+  code: string;
+  discount: number;
+  validUntil: string;
+  isUsed: boolean;
+}
+
+const ROLES = ['Пассажир', 'Водитель'];
 
 const HelpSection = () => {
   const handleEmailPress = (subject: string) => {
@@ -116,7 +142,7 @@ const HelpSection = () => {
       onPress: () => {
         Alert.alert(
           'Условия использования',
-          '1. Приложение предназначено для заказа такси\n2. Минимальная стоимость поездки: 300₽\n3. Оплата производится после завершения поездки\n4. В случае отмены заказа менее чем за 5 минут до подачи автомобиля, взимается штраф',
+          '1. Приложение предназначено для заказа такси\n2. Минимальная стоимость поездки: 1000₸\n3. Оплата производится после завершения поездки\n4. В случае отмены заказа менее чем за 5 минут до подачи автомобиля, взимается штраф',
           [{ text: 'OK', style: 'default' }]
         );
       }
@@ -153,7 +179,7 @@ const ProfileScreen = () => {
   const [profile, setProfile] = useState<UserProfile>({
     name: 'Хасан',
     surname: 'Рахимбаев',
-    role: 'Водитель',
+    role: 'Пассажир',
     avatar: '/assets/images/hasan.png',
   });
   const [editedProfile, setEditedProfile] = useState<UserProfile>(profile);
@@ -172,6 +198,70 @@ const ProfileScreen = () => {
     }
   ]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [rideHistory, setRideHistory] = useState<RideHistory[]>([
+    {
+      id: '1',
+      date: '2024-03-20',
+      from: 'ул. Ленина, 10',
+      to: 'ул. Гагарина, 5',
+      price: 3500,
+      paymentMethod: 'Карта',
+      status: 'completed'
+    },
+    {
+      id: '2',
+      date: '2024-03-19',
+      from: 'пр. Мира, 15',
+      to: 'ул. Пушкина, 8',
+      price: 2800,
+      paymentMethod: 'Наличные',
+      status: 'completed'
+    }
+  ]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
+    {
+      id: '1',
+      type: 'card',
+      lastFourDigits: '4242',
+      isDefault: true,
+      cardHolder: 'Хасан Р.',
+      expiryDate: '12/25'
+    },
+    {
+      id: '2',
+      type: 'card',
+      lastFourDigits: '8888',
+      isDefault: false,
+      cardHolder: 'Хасан Р.',
+      expiryDate: '06/24'
+    },
+    {
+      id: '3',
+      type: 'cash',
+      isDefault: false
+    }
+  ]);
+  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([
+    {
+      code: 'WELCOME2025',
+      discount: 10,
+      validUntil: '2025-12-31',
+      isUsed: false
+    }
+  ]);
+  const [isPromoModalVisible, setIsPromoModalVisible] = useState(false);
+  const [newPromoCode, setNewPromoCode] = useState('');
+  const [isAddCardModalVisible, setIsAddCardModalVisible] = useState(false);
+  const [newCard, setNewCard] = useState({
+    number: '',
+    holder: '',
+    expiry: '',
+    cvv: ''
+  });
+  const [selectedRide, setSelectedRide] = useState<RideHistory | null>(null);
+  const [isRideDetailsModalVisible, setIsRideDetailsModalVisible] = useState(false);
+  const [isEditCardModalVisible, setIsEditCardModalVisible] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<PaymentMethod | null>(null);
 
   const fetchNotifications = async () => {
     try {
@@ -353,6 +443,217 @@ const ProfileScreen = () => {
     );
   };
 
+  const handleAddPromoCode = () => {
+    if (newPromoCode.trim()) {
+      setPromoCodes(prev => [...prev, {
+        code: newPromoCode.toUpperCase(),
+        discount: 10,
+        validUntil: '2024-12-31',
+        isUsed: false
+      }]);
+      setNewPromoCode('');
+      setIsPromoModalVisible(false);
+    }
+  };
+
+  const handleAddCard = () => {
+    if (newCard.number && newCard.holder && newCard.expiry && newCard.cvv) {
+      setPaymentMethods(prev => [...prev, {
+        id: Date.now().toString(),
+        type: 'card',
+        lastFourDigits: newCard.number.slice(-4),
+        isDefault: false,
+        cardHolder: newCard.holder,
+        expiryDate: newCard.expiry
+      }]);
+      setNewCard({ number: '', holder: '', expiry: '', cvv: '' });
+      setIsAddCardModalVisible(false);
+    }
+  };
+
+  const handleSetDefaultPayment = (id: string) => {
+    setPaymentMethods(prev => prev.map(method => ({
+      ...method,
+      isDefault: method.id === id
+    })));
+  };
+
+  const handleRidePress = (ride: RideHistory) => {
+    setSelectedRide(ride);
+    setIsRideDetailsModalVisible(true);
+  };
+
+  const handleEditCard = (card: PaymentMethod) => {
+    setSelectedCard(card);
+    setNewCard({
+      number: `****${card.lastFourDigits}`,
+      holder: card.cardHolder || '',
+      expiry: card.expiryDate || '',
+      cvv: ''
+    });
+    setIsEditCardModalVisible(true);
+  };
+
+  const handleDeleteCard = (cardId: string) => {
+    Alert.alert(
+      'Удаление карты',
+      'Вы уверены, что хотите удалить эту карту?',
+      [
+        {
+          text: 'Отмена',
+          style: 'cancel'
+        },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: () => {
+            setPaymentMethods(prev => prev.filter(method => method.id !== cardId));
+          }
+        }
+      ]
+    );
+  };
+
+  const handleUpdateCard = () => {
+    if (selectedCard && newCard.holder && newCard.expiry) {
+      setPaymentMethods(prev => prev.map(method => 
+        method.id === selectedCard.id
+          ? {
+              ...method,
+              cardHolder: newCard.holder,
+              expiryDate: newCard.expiry
+            }
+          : method
+      ));
+      setNewCard({ number: '', holder: '', expiry: '', cvv: '' });
+      setSelectedCard(null);
+      setIsEditCardModalVisible(false);
+    }
+  };
+
+  const renderRideHistory = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>История поездок</Text>
+      {rideHistory.map(ride => (
+        <TouchableOpacity
+          key={ride.id}
+          style={styles.rideItem}
+          onPress={() => handleRidePress(ride)}
+        >
+          <View style={styles.rideHeader}>
+            <Text style={styles.rideDate}>{ride.date}</Text>
+            <Text style={styles.ridePrice}>{ride.price}₸</Text>
+          </View>
+          <View style={styles.rideLocations}>
+            <Text style={styles.rideLocation}>От: {ride.from}</Text>
+            <Text style={styles.rideLocation}>До: {ride.to}</Text>
+          </View>
+          <View style={styles.rideFooter}>
+            <Text style={styles.paymentMethod}>{ride.paymentMethod}</Text>
+            <Text style={[
+              styles.rideStatus,
+              { color: ride.status === 'completed' ? '#4CAF50' : '#F44336' }
+            ]}>
+              {ride.status === 'completed' ? 'Завершено' : 'Отменено'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  const renderPaymentMethods = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Способы оплаты</Text>
+      {paymentMethods.map(method => (
+        <View key={method.id} style={styles.paymentMethodItem}>
+          <TouchableOpacity
+            style={styles.paymentMethodLeft}
+            onPress={() => handleSetDefaultPayment(method.id)}
+          >
+            <Ionicons 
+              name={method.type === 'card' ? 'card-outline' : 'cash-outline'} 
+              size={24} 
+              color="#007AFF" 
+            />
+            <View style={styles.paymentMethodInfo}>
+              <Text style={styles.paymentMethodType}>
+                {method.type === 'card' ? 'Карта' : 'Наличные'}
+              </Text>
+              {method.type === 'card' && (
+                <>
+                  <Text style={styles.cardNumber}>**** {method.lastFourDigits}</Text>
+                  <Text style={styles.cardDetails}>
+                    {method.cardHolder} • {method.expiryDate}
+                  </Text>
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+          <View style={styles.paymentMethodRight}>
+            {method.isDefault && (
+              <Text style={styles.defaultPayment}>По умолчанию</Text>
+            )}
+            <Ionicons 
+              name={method.isDefault ? "checkmark-circle" : "ellipse-outline"} 
+              size={24} 
+              color={method.isDefault ? "#4CAF50" : "#8E8E93"} 
+            />
+          </View>
+          {method.type === 'card' && (
+            <View style={styles.cardActions}>
+              <TouchableOpacity
+                style={styles.cardActionButton}
+                onPress={() => handleEditCard(method)}
+              >
+                <Ionicons name="pencil-outline" size={20} color="#007AFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cardActionButton}
+                onPress={() => handleDeleteCard(method.id)}
+              >
+                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      ))}
+      <TouchableOpacity
+        style={styles.addCardButton}
+        onPress={() => setIsAddCardModalVisible(true)}
+      >
+        <Ionicons name="add-circle-outline" size={24} color="#007AFF" />
+        <Text style={styles.addCardButtonText}>Добавить карту</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderPromoCodes = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Промокоды</Text>
+      {promoCodes.map(promo => (
+        <View key={promo.code} style={styles.promoItem}>
+          <View style={styles.promoInfo}>
+            <Text style={styles.promoCode}>{promo.code}</Text>
+            <Text style={styles.promoDiscount}>Скидка {promo.discount}%</Text>
+          </View>
+          <Text style={styles.promoValidUntil}>
+            Действует до: {promo.validUntil}
+          </Text>
+          {promo.isUsed && (
+            <Text style={styles.promoUsed}>Использован</Text>
+          )}
+        </View>
+      ))}
+      <TouchableOpacity
+        style={styles.addPromoButton}
+        onPress={() => setIsPromoModalVisible(true)}
+      >
+        <Text style={styles.addPromoButtonText}>Добавить промокод</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
@@ -371,19 +672,19 @@ const ProfileScreen = () => {
           <Text style={styles.sectionTitle}>Статистика</Text>
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Ionicons name="car" size={24} color="#007AFF" />
-              <Text style={styles.statValue}>150</Text>
-              <Text style={styles.statLabel}>Поездок</Text>
+              <Ionicons name="wallet-outline" size={24} color="#007AFF" />
+              <Text style={styles.statValue}>45,000₸</Text>
+              <Text style={styles.statLabel}>Потрачено</Text>
             </View>
             <View style={styles.statItem}>
               <Ionicons name="star" size={24} color="#FFD700" />
-              <Text style={styles.statValue}>4.8</Text>
+              <Text style={styles.statValue}>5.0</Text>
               <Text style={styles.statLabel}>Рейтинг</Text>
             </View>
             <View style={styles.statItem}>
-              <Ionicons name="time" size={24} color="#34C759" />
-              <Text style={styles.statValue}>98%</Text>
-              <Text style={styles.statLabel}>Время</Text>
+              <Ionicons name="gift-outline" size={24} color="#34C759" />
+              <Text style={styles.statValue}>3</Text>
+              <Text style={styles.statLabel}>Промокода</Text>
             </View>
           </View>
         </View>
@@ -404,6 +705,10 @@ const ProfileScreen = () => {
             <Ionicons name="chevron-forward" size={24} color="#999" />
           </TouchableOpacity>
         </View>
+
+        {renderRideHistory()}
+        {renderPaymentMethods()}
+        {renderPromoCodes()}
 
         <HelpSection />
 
@@ -585,6 +890,188 @@ const ProfileScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={isPromoModalVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Добавить промокод</Text>
+            <TextInput
+              style={styles.promoInput}
+              placeholder="Введите промокод"
+              value={newPromoCode}
+              onChangeText={setNewPromoCode}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setIsPromoModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Отмена</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleAddPromoCode}
+              >
+                <Text style={styles.modalButtonText}>Добавить</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isAddCardModalVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Добавить карту</Text>
+            <TextInput
+              style={styles.cardInput}
+              placeholder="Номер карты"
+              value={newCard.number}
+              onChangeText={(text) => setNewCard({ ...newCard, number: text })}
+              keyboardType="numeric"
+            />
+            <TextInput
+              style={styles.cardInput}
+              placeholder="Владелец карты"
+              value={newCard.holder}
+              onChangeText={(text) => setNewCard({ ...newCard, holder: text })}
+            />
+            <View style={styles.cardInputRow}>
+              <TextInput
+                style={[styles.cardInput, { flex: 1, marginRight: 10 }]}
+                placeholder="MM/YY"
+                value={newCard.expiry}
+                onChangeText={(text) => setNewCard({ ...newCard, expiry: text })}
+              />
+              <TextInput
+                style={[styles.cardInput, { flex: 1 }]}
+                placeholder="CVV"
+                value={newCard.cvv}
+                onChangeText={(text) => setNewCard({ ...newCard, cvv: text })}
+                keyboardType="numeric"
+                secureTextEntry
+              />
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setIsAddCardModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Отмена</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleAddCard}
+              >
+                <Text style={styles.modalButtonText}>Добавить</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isRideDetailsModalVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Детали поездки</Text>
+            {selectedRide && (
+              <View style={styles.rideDetails}>
+                <View style={styles.rideDetailRow}>
+                  <Text style={styles.rideDetailLabel}>Дата:</Text>
+                  <Text style={styles.rideDetailValue}>{selectedRide.date}</Text>
+                </View>
+                <View style={styles.rideDetailRow}>
+                  <Text style={styles.rideDetailLabel}>Откуда:</Text>
+                  <Text style={styles.rideDetailValue}>{selectedRide.from}</Text>
+                </View>
+                <View style={styles.rideDetailRow}>
+                  <Text style={styles.rideDetailLabel}>Куда:</Text>
+                  <Text style={styles.rideDetailValue}>{selectedRide.to}</Text>
+                </View>
+                <View style={styles.rideDetailRow}>
+                  <Text style={styles.rideDetailLabel}>Стоимость:</Text>
+                  <Text style={styles.rideDetailValue}>{selectedRide.price}₸</Text>
+                </View>
+                <View style={styles.rideDetailRow}>
+                  <Text style={styles.rideDetailLabel}>Способ оплаты:</Text>
+                  <Text style={styles.rideDetailValue}>{selectedRide.paymentMethod}</Text>
+                </View>
+                <View style={styles.rideDetailRow}>
+                  <Text style={styles.rideDetailLabel}>Статус:</Text>
+                  <Text style={[
+                    styles.rideDetailValue,
+                    { color: selectedRide.status === 'completed' ? '#4CAF50' : '#F44336' }
+                  ]}>
+                    {selectedRide.status === 'completed' ? 'Завершено' : 'Отменено'}
+                  </Text>
+                </View>
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.modalButton, styles.closeButton]}
+              onPress={() => setIsRideDetailsModalVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>Закрыть</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isEditCardModalVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Редактировать карту</Text>
+            <TextInput
+              style={styles.cardInput}
+              placeholder="Номер карты"
+              value={newCard.number}
+              editable={false}
+            />
+            <TextInput
+              style={styles.cardInput}
+              placeholder="Владелец карты"
+              value={newCard.holder}
+              onChangeText={(text) => setNewCard({ ...newCard, holder: text })}
+            />
+            <TextInput
+              style={styles.cardInput}
+              placeholder="MM/YY"
+              value={newCard.expiry}
+              onChangeText={(text) => setNewCard({ ...newCard, expiry: text })}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setIsEditCardModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Отмена</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleUpdateCard}
+              >
+                <Text style={styles.modalButtonText}>Сохранить</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -624,14 +1111,14 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   section: {
-    backgroundColor: '#FFFFFF',
-    marginTop: 20,
-    padding: 15,
+    padding: 16,
+    backgroundColor: '#fff',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 16,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -680,20 +1167,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 20,
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: '#fff',
     padding: 20,
-    width: '90%',
-    maxWidth: 400,
+    borderRadius: 12,
+    width: '80%',
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    marginBottom: 16,
   },
   avatarContainer: {
     alignItems: 'center',
@@ -785,26 +1269,25 @@ const styles = StyleSheet.create({
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
+    justifyContent: 'flex-end',
   },
   modalButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 10,
-    marginHorizontal: 5,
+    padding: 12,
+    borderRadius: 8,
+    marginLeft: 12,
+    minWidth: 100,
+    alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#f5f5f5',
   },
   saveButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: '#007AFF',
   },
-  buttonText: {
-    color: '#FFFFFF',
+  modalButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: '500',
+    color: '#fff',
   },
   securityContent: {
     backgroundColor: '#FFFFFF',
@@ -934,6 +1417,194 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 20,
     padding: 20,
+  },
+  rideItem: {
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  rideHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  rideDate: {
+    fontSize: 14,
+    color: '#666',
+  },
+  ridePrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  rideLocations: {
+    marginBottom: 8,
+  },
+  rideLocation: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  rideFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  paymentMethod: {
+    fontSize: 14,
+    color: '#666',
+  },
+  rideStatus: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  paymentMethodItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  paymentMethodInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  paymentMethodType: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  cardNumber: {
+    fontSize: 14,
+    color: '#666',
+  },
+  defaultPayment: {
+    fontSize: 12,
+    color: '#4CAF50',
+  },
+  promoItem: {
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  promoInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  promoCode: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  promoDiscount: {
+    fontSize: 14,
+    color: '#4CAF50',
+  },
+  promoValidUntil: {
+    fontSize: 12,
+    color: '#666',
+  },
+  promoUsed: {
+    fontSize: 12,
+    color: '#F44336',
+    marginTop: 4,
+  },
+  addPromoButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  addPromoButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  promoInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  paymentMethodLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  paymentMethodRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cardDetails: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  addCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  addCardButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  cardInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    fontSize: 16,
+  },
+  cardInputRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  rideDetails: {
+    marginBottom: 20,
+  },
+  rideDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  rideDetailLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  rideDetailValue: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  cardActionButton: {
+    padding: 5,
+    marginLeft: 10,
+  },
+  closeButton: {
+    backgroundColor: '#007AFF',
+    width: '100%',
+    justifyContent: 'center',
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#fff',
   },
 });
 

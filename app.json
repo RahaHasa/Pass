@@ -43,7 +43,9 @@
         {
           "icon": "./assets/images/notification-icon.png",
           "color": "#ffffff",
-          "sounds": ["./assets/sounds/notification.wav"]
+          "sounds": [
+            "./assets/sounds/notification.wav"
+          ]
         }
       ],
       [
@@ -51,7 +53,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Приложению необходим доступ к геолокации для отображения вашего местоположения на карте"
         }
-      ]
+      ],
+      "expo-router"
     ],
     "notification": {
       "icon": "./assets/images/notification-icon.png",
